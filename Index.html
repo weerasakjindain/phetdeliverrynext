@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PHET Delivery+</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Vue 3 -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Sarabun', sans-serif; background-color: #f3f4f6; }
+    .glass-card { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); }
+    .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="antialiased min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-indigo-100 text-gray-800">
+
+  <div id="app" class="pb-12" v-cloak>
+    
+    <!-- Navbar -->
+    <nav class="bg-white shadow-sm sticky top-0 z-50">
+      <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
+        <div class="flex items-center space-x-2 text-blue-600 font-bold text-xl cursor-pointer" @click="changeView('home')">
+          <i class="fa-solid fa-layer-group text-2xl"></i>
+          <span>PHET Delivery+</span>
+        </div>
+        <button v-if="currentView !== 'admin-login' && currentView !== 'admin-dashboard'" 
+                @click="changeView('admin-login')" 
+                class="text-sm text-gray-500 hover:text-blue-600 transition">
+          <i class="fa-solid fa-lock mr-1"></i> Admin
+        </button>
+        <button v-if="currentView === 'admin-dashboard'" 
+                @click="logout()" 
+                class="text-sm text-red-500 hover:text-red-700 transition font-semibold">
+          <i class="fa-solid fa-sign-out-alt mr-1"></i> Logout
+        </button>
+      </div>
+    </nav>
+
+    <div class="max-w-6xl mx-auto px-4 mt-8">
+      
+      <!-- Loading State -->
+      <div v-if="isLoading" class="flex flex-col items-center justify-center py-20">
+        <div class="loader mb-4"></div>
+        <p class="text-gray-500">กำลังโหลดข้อมูลระบบ...</p>
+      </div>
+
+      <!-- ============================================== -->
+      <!-- VIEW: HOME (ผู้ใช้งานทั่วไป) -->
+      <!-- ============================================== -->
+      <div v-if="currentView === 'home' && !isLoading" class="animate-fade-in">
+        
+        <!-- Header & Stats -->
+        <div class="text-center mb-10">
+          <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-3">ศูนย์รวมบริการจาก ศพช.เพชรบุรี(PHET Delivery+)</h1>
+          <p class="text-gray-600 max-w-2xl mx-auto">เลือกเข้าใช้งานระบบต่างๆ ของเราได้จากเมนูด้านล่างนี้</p>
+          <div class="mt-4 inline-block bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-semibold shadow-sm">
+            <i class="fa-solid fa-chart-line mr-2"></i> ผู้เข้าชมระบบวันนี้ : {{ todayVisits }} คน
+          </div>
+        </div>
+
+        <!-- Menu Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div v-for="menu in menus" :key="menu.id" 
+               @click="openLink(menu)"
+               class="glass-card p-6 rounded-2xl shadow-sm hover:shadow-xl cursor-pointer transition-all duration-300 transform hover:-translate-y-1 group">
+            <div class="flex items-start space-x-4">
+              <div class="bg-gradient-to-br from-blue-500 to-indigo-600 text-white w-14 h-14 rounded-xl flex items-center justify-center text-2xl shadow-md group-hover:scale-110 transition">
+                <i :class="['fa-solid', menu.icon]"></i>
+              </div>
+              <div class="flex-1">
+                <h3 class="text-lg font-bold text-gray-800 mb-1 leading-tight group-hover:text-blue-600 transition">{{ menu.title }}</h3>
+                <div class="flex items-center text-xs text-gray-400 mt-2">
+                  <i class="fa-solid fa-mouse-pointer mr-1"></i> เข้าใช้งานแล้ว {{ menu.clicks }} ครั้ง
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================== -->
+      <!-- VIEW: ADMIN LOGIN -->
+      <!-- ============================================== -->
+      <div v-if="currentView === 'admin-login' && !isLoading" class="max-w-md mx-auto pt-10">
+        <div class="bg-white p-8 rounded-2xl shadow-lg text-center">
+          <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-500 text-2xl">
+            <i class="fa-solid fa-shield-halved"></i>
+          </div>
+          <h2 class="text-2xl font-bold mb-6 text-gray-800">เข้าสู่ระบบ Admin</h2>
+          <form @submit.prevent="login">
+            <input type="password" v-model="loginPassword" placeholder="กรอกรหัสผ่าน" 
+                   class="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:outline-none mb-4 text-center">
+            <p v-if="loginError" class="text-red-500 text-sm mb-4">{{ loginError }}</p>
+            <button type="submit" class="w-full bg-gray-800 text-white font-bold py-3 rounded-lg hover:bg-black transition">
+              เข้าสู่ระบบ
+            </button>
+            <button type="button" @click="changeView('home')" class="w-full mt-3 text-gray-500 text-sm hover:text-gray-700">
+              กลับไปหน้าแรก
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- ============================================== -->
+      <!-- VIEW: ADMIN DASHBOARD -->
+      <!-- ============================================== -->
+      <div v-if="currentView === 'admin-dashboard' && !isLoading">
+        
+        <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+          <div>
+            <h2 class="text-2xl font-bold text-gray-800">Admin Dashboard</h2>
+            <p class="text-gray-500 text-sm">จัดการข้อมูลและการแสดงผลระบบ</p>
+          </div>
+          <a :href="adminData.sheetUrl" target="_blank" 
+             class="bg-green-500 hover:bg-green-600 text-white px-5 py-2 rounded-lg font-semibold shadow transition flex items-center">
+            <i class="fa-solid fa-file-excel mr-2"></i> เปิด Google Sheet Database
+          </a>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          <!-- Column 1: Visits Management -->
+          <div class="lg:col-span-1 space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
+              <h3 class="text-lg font-bold mb-4 flex items-center"><i class="fa-solid fa-chart-bar text-blue-500 mr-2"></i> แก้ไขสถิติรายวัน</h3>
+              <div class="max-h-96 overflow-y-auto">
+                <table class="w-full text-sm text-left">
+                  <thead class="text-xs text-gray-500 uppercase bg-gray-50">
+                    <tr>
+                      <th class="px-3 py-2">วันที่</th>
+                      <th class="px-3 py-2">ยอดเข้าชม</th>
+                      <th class="px-3 py-2 text-right">บันทึก</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="visit in adminData.visits" :key="visit.row" class="border-b">
+                      <td class="px-3 py-3 font-medium">{{ visit.date }}</td>
+                      <td class="px-3 py-3">
+                        <input type="number" v-model="visit.count" class="w-20 border rounded px-2 py-1 text-center">
+                      </td>
+                      <td class="px-3 py-3 text-right">
+                        <button @click="saveVisit(visit)" class="text-blue-500 hover:text-blue-700 p-1">
+                          <i class="fa-solid fa-save"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column 2: Menu Management -->
+          <div class="lg:col-span-2">
+            <div class="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
+              <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold flex items-center"><i class="fa-solid fa-list-check text-blue-500 mr-2"></i> จัดการเมนูลิงก์</h3>
+                <button @click="openMenuModal('ADD', null)" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded text-sm font-semibold transition">
+                  <i class="fa-solid fa-plus mr-1"></i> เพิ่มเมนูใหม่
+                </button>
+              </div>
+              
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                  <thead class="text-xs text-gray-500 uppercase bg-gray-50 border-b">
+                    <tr>
+                      <th class="px-4 py-3">ไอคอน & ชื่อเมนู</th>
+                      <th class="px-4 py-3">จำนวนคลิก</th>
+                      <th class="px-4 py-3">สถานะ</th>
+                      <th class="px-4 py-3 text-center">จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="menu in adminData.menus" :key="menu.id" class="border-b hover:bg-gray-50 transition">
+                      <td class="px-4 py-4">
+                        <div class="flex items-center space-x-3">
+                          <i :class="['fa-solid', menu.icon, 'text-gray-400 w-5']"></i>
+                          <div>
+                            <p class="font-bold text-gray-800">{{ menu.title }}</p>
+                            <p class="text-xs text-blue-500 truncate max-w-[200px]">{{ menu.url }}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="px-4 py-4 font-semibold">{{ menu.clicks }}</td>
+                      <td class="px-4 py-4">
+                        <span :class="menu.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'" class="px-2 py-1 rounded text-xs font-bold">
+                          {{ menu.status }}
+                        </span>
+                      </td>
+                      <td class="px-4 py-4 text-center space-x-2">
+                        <button @click="openMenuModal('EDIT', menu)" class="text-yellow-500 hover:text-yellow-600"><i class="fa-solid fa-pen-to-square text-lg"></i></button>
+                        <button @click="deleteMenu(menu)" class="text-red-500 hover:text-red-600"><i class="fa-solid fa-trash text-lg"></i></button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Menu Modal (Form) -->
+      <div v-if="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fade-in">
+        <div class="bg-white rounded-2xl w-full max-w-md p-6 m-4 shadow-2xl">
+          <h3 class="text-xl font-bold mb-4">{{ modalMode === 'ADD' ? 'เพิ่มเมนูใหม่' : 'แก้ไขเมนู' }}</h3>
+          
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-semibold mb-1">ชื่อเมนู</label>
+              <input type="text" v-model="currentForm.title" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold mb-1">URL (ลิงก์ปลายทาง)</label>
+              <input type="text" v-model="currentForm.url" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold mb-1">ไอคอน (FontAwesome)</label>
+                <input type="text" v-model="currentForm.icon" placeholder="เช่น fa-robot" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              </div>
+              <div>
+                <label class="block text-sm font-semibold mb-1">จำนวนการคลิก</label>
+                <input type="number" v-model="currentForm.clicks" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold mb-1">สถานะ</label>
+              <select v-model="currentForm.status" class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <option value="Active">เปิดใช้งาน (Active)</option>
+                <option value="Inactive">ซ่อน (Inactive)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="mt-6 flex justify-end space-x-3">
+            <button @click="showModal = false" class="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg transition">ยกเลิก</button>
+            <button @click="saveMenu" class="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition shadow">บันทึกข้อมูล</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const { createApp } = Vue;
+
+    createApp({
+      data() {
+        return {
+          isLoading: true,
+          currentView: 'home', // home, admin-login, admin-dashboard
+          menus: [],
+          todayVisits: 0,
+          
+          // Admin States
+          loginPassword: '',
+          loginError: '',
+          adminData: {
+            menus: [],
+            visits: [],
+            sheetUrl: ''
+          },
+          
+          // Modal States
+          showModal: false,
+          modalMode: 'ADD',
+          currentForm: {}
+        }
+      },
+      mounted() {
+        this.loadAppData();
+      },
+      methods: {
+        changeView(view) {
+          this.currentView = view;
+          if(view === 'home') this.loadAppData();
+        },
+        
+        // ---- User Methods ----
+        loadAppData() {
+          this.isLoading = true;
+          google.script.run.withSuccessHandler((data) => {
+            this.menus = data.menus;
+            this.todayVisits = data.todayVisits;
+            this.isLoading = false;
+          }).getAppData();
+        },
+        openLink(menu) {
+          // เพิ่ม count ใน UI ทันที
+          menu.clicks++; 
+          // เปิด URL
+          window.open(menu.url, '_blank');
+          // ส่งไปบันทึกหลังบ้านแบบเงียบๆ
+          google.script.run.recordMenuClick(menu.id);
+        },
+
+        // ---- Admin Methods ----
+        login() {
+          this.isLoading = true;
+          this.loginError = '';
+          google.script.run.withSuccessHandler((isValid) => {
+            if(isValid) {
+              this.loadAdminDashboard();
+            } else {
+              this.loginError = 'รหัสผ่านไม่ถูกต้อง';
+              this.isLoading = false;
+            }
+          }).verifyAdmin(this.loginPassword);
+        },
+        logout() {
+          this.loginPassword = '';
+          this.changeView('home');
+        },
+        loadAdminDashboard() {
+          google.script.run.withSuccessHandler((data) => {
+            this.adminData = data;
+            this.currentView = 'admin-dashboard';
+            this.isLoading = false;
+          }).withFailureHandler((err) => {
+            alert('Error: ' + err.message);
+            this.isLoading = false;
+          }).getAdminDashboard(this.loginPassword);
+        },
+        saveVisit(visit) {
+          // บันทึกสถิติ
+          google.script.run.withSuccessHandler(() => {
+            alert('บันทึกสถิติวันที่ ' + visit.date + ' เรียบร้อย');
+          }).updateVisitStat(this.loginPassword, visit.row, visit.count);
+        },
+        
+        // ---- Menu CRUD Methods ----
+        openMenuModal(mode, menuData) {
+          this.modalMode = mode;
+          if (mode === 'ADD') {
+            this.currentForm = { title: '', url: '', icon: 'fa-link', clicks: 0, status: 'Active' };
+          } else {
+            this.currentForm = JSON.parse(JSON.stringify(menuData)); // Clone object
+          }
+          this.showModal = true;
+        },
+        saveMenu() {
+          this.isLoading = true;
+          this.showModal = false;
+          google.script.run.withSuccessHandler(() => {
+            this.loadAdminDashboard(); // โหลดข้อมูลใหม่
+          }).saveMenuAction(this.loginPassword, this.modalMode, this.currentForm);
+        },
+        deleteMenu(menu) {
+          if(confirm('คุณแน่ใจหรือไม่ที่จะลบเมนู: ' + menu.title + ' ?')) {
+            this.isLoading = true;
+            google.script.run.withSuccessHandler(() => {
+              this.loadAdminDashboard();
+            }).saveMenuAction(this.loginPassword, 'DELETE', menu);
+          }
+        }
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
